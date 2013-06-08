@@ -4,6 +4,7 @@ using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
@@ -11,39 +12,60 @@ namespace Redwood
 {
     public class Program
     {
+        private static bool cancel = false;
+
         public static void Main(string[] args)
         {
             try
             {
-                var path = ConfigurationManager.AppSettings["path"];
-                Console.WriteLine("Reading file {0}...", path);
+                Console.WriteLine("Redwood has started. Use 'Ctrl + C' to stop.");
 
-                if (!File.Exists(path))
-                {
-                    Console.WriteLine("{0} does not exist!", path);
-                    return;
-                }
+                var thread = new Thread(PrintUrls);
+                thread.Start();
 
-                var results = new List<string>();
-                var bookmark = GetBookmark(path);
-                var bookmarkBarChildren = bookmark.roots.Bookmark_bar.Children;
-                if (bookmarkBarChildren != null && bookmarkBarChildren.Any())
-                {
-                    foreach (var bookmarkBarChild in bookmarkBarChildren)
+                var reset = new AutoResetEvent(false);
+                Console.CancelKeyPress += (sender, eventArgs) =>
                     {
-                        results = GetChild(results, bookmarkBarChild);
-                    }
-                }
+                        eventArgs.Cancel = true;
+                        reset.Set();
+                    };
 
-                foreach (var result in results)
-                {
-                    Console.WriteLine(result);
-                }
+                reset.WaitOne();
+                cancel = true;
+                Console.WriteLine("Stopping Redwood.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
                 throw;
+            }
+        }
+
+        private static void PrintUrls()
+        {
+            var path = ConfigurationManager.AppSettings["path"];
+            Console.WriteLine("Reading file {0}...", path);
+
+            if (!File.Exists(path))
+            {
+                Console.WriteLine("{0} does not exist!", path);
+                return;
+            }
+
+            var results = new List<string>();
+            var bookmark = GetBookmark(path);
+            var bookmarkBarChildren = bookmark.roots.Bookmark_bar.Children;
+            if (bookmarkBarChildren != null && bookmarkBarChildren.Any())
+            {
+                foreach (var bookmarkBarChild in bookmarkBarChildren)
+                {
+                    results = GetChild(results, bookmarkBarChild);
+                }
+            }
+
+            foreach (var result in results)
+            {
+                Console.WriteLine(result);
             }
         }
 
